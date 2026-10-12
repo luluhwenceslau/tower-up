@@ -4,6 +4,7 @@ public class Block : MonoBehaviour
 {
     private bool released = false;
     private bool landed = false;
+    private float landedY;
 
     private Transform followTarget;
 
@@ -16,7 +17,7 @@ public class Block : MonoBehaviour
 
     private void Update()
     {
-        if (!released || landed)
+        if (!released)
             return;
 
         Camera cam = Camera.main;
@@ -25,7 +26,10 @@ public class Block : MonoBehaviour
         {
             Vector3 screenPosition = cam.WorldToViewportPoint(transform.position);
 
-            if (screenPosition.y < -0.2f)
+            bool fellOffScreenBeforeLanding = !landed && screenPosition.y < -0.2f;
+            bool fellAfterLanding = landed && transform.position.y < landedY - 1.5f;
+
+            if (fellOffScreenBeforeLanding || fellAfterLanding)
             {
                 TowerManager towerManager = FindAnyObjectByType<TowerManager>();
 
@@ -64,6 +68,7 @@ public class Block : MonoBehaviour
             return;
 
         landed = true;
+        landedY = transform.position.y;
 
         TowerManager towerManager = FindAnyObjectByType<TowerManager>();
 

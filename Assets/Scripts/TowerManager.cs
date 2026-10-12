@@ -3,45 +3,72 @@ using UnityEngine.InputSystem;
 
 public class TowerManager : MonoBehaviour
 {
+    [Header("Blocos")]
     public GameObject blockPrefab;
     public Transform spawnPoint;
+    public Color[] blockColors =
+    {
+        new Color(0.86f, 0.12f, 0.14f), // Vermelho
+        new Color(0.90f, 0.35f, 0.03f), // Laranja
+        new Color(0.78f, 0.54f, 0.02f), // Amarelo-ouro
+        new Color(0.78f, 0.08f, 0.36f), // Rosa
+        new Color(0.45f, 0.12f, 0.68f), // Roxo
+        new Color(0.38f, 0.56f, 0.08f)  // Verde
+    };
 
-    public Camera cameraTransform;
-
-    public float cameraFollowSpeed = 3f;
-    public float cameraRisePerBlock = 1f;
+    [Header("Próximo bloco")]
+    public float nextBlockSpawnDelay = 0.10f;
+    public float spawnPointSettleTolerance = 0.1f;
 
     private GameObject currentBlock;
     private bool waitingForNextBlock = false;
 
     private int landedBlocks = 0;
-    private float cameraStartY;
-
-    public Transform cableRig;
-
-    public float swaySpeed = 1.5f;
-    public float swayAmount = 2f;
-    public float swayIncreasePerBlock = 0.15f;
-
-    public float gameOverAngle = 15f;
+    private Transform lastLandedBlock;
+    private float nextBlockSpawnTime;
+    private int previousColorIndex = -1;
 
     private bool gameOver = false;
+    private GameOverUI gameOverUI;
+    private GameHUD gameHUD;
+    private TowerPresentation towerPresentation;
+    private float gameStartTime;
 
+    void Awake()
+    {
+        gameOverUI = GetComponent<GameOverUI>();
+        if (gameOverUI == null)
+            gameOverUI = gameObject.AddComponent<GameOverUI>();
+
+        gameHUD = GetComponent<GameHUD>();
+        if (gameHUD == null)
+            gameHUD = gameObject.AddComponent<GameHUD>();
+
+        towerPresentation = GetComponent<TowerPresentation>();
+        if (towerPresentation == null)
+            towerPresentation = gameObject.AddComponent<TowerPresentation>();
+    }
+
+    // Inicialização e atualização do jogo
     void Start()
     {
-        cameraStartY = cameraTransform.transform.position.y;
+        gameStartTime = Time.time;
         SpawnBlock();
     }
 
     void Update()
     {
+        if (gameOver)
+            return;
+
         if (currentBlock != null && Mouse.current.leftButton.wasPressedThisFrame)
         {
             ReleaseBlock();
         }
 
-        FollowTower();
-        SwayCable();
+        towerPresentation.UpdatePresentation(landedBlocks, lastLandedBlock);
+        gameHUD.SetProgress(Time.time - gameStartTime, landedBlocks);
+        TrySpawnNextBlock();
 
         if (currentBlock != null)
         {
@@ -54,9 +81,11 @@ public class TowerManager : MonoBehaviour
         }
     }
 
+    // Criação e liberação de blocos
     void SpawnBlock()
     {
         currentBlock = Instantiate(blockPrefab, spawnPoint.position, Quaternion.identity);
+        ApplyNextBlockColor(currentBlock);
 
         Rigidbody2D rb = currentBlock.GetComponent<Rigidbody2D>();
         rb.bodyType = RigidbodyType2D.Kinematic;
@@ -67,6 +96,24 @@ public class TowerManager : MonoBehaviour
         {
             block.SetFollowTarget(spawnPoint);
         }
+    }
+
+    private void ApplyNextBlockColor(GameObject block)
+    {
+        if (blockColors == null || blockColors.Length == 0)
+            return;
+
+        int colorIndex = Random.Range(0, blockColors.Length);
+        if (blockColors.Length > 1 && colorIndex == previousColorIndex)
+        {
+            colorIndex = (colorIndex + Random.Range(1, blockColors.Length)) % blockColors.Length;
+        }
+
+        SpriteRenderer spriteRenderer = block.GetComponent<SpriteRenderer>();
+        if (spriteRenderer != null)
+            spriteRenderer.color = blockColors[colorIndex];
+
+        previousColorIndex = colorIndex;
     }
 
     void ReleaseBlock()
@@ -90,88 +137,41 @@ public class TowerManager : MonoBehaviour
             return;
 
         landedBlocks++;
-
-        CheckTowerTilt(landedBlock);
-
-        if (gameOver)
-            return;
+        lastLandedBlock = landedBlock;
 
         if (waitingForNextBlock)
             return;
 
         waitingForNextBlock = true;
-
-        Invoke(nameof(SpawnNextBlock), 0.2f);
+        nextBlockSpawnTime = Time.time + (landedBlocks == 1 ? 0f : nextBlockSpawnDelay);
     }
 
-    void SpawnNextBlock()
+    void TrySpawnNextBlock()
     {
+        if (!waitingForNextBlock || Time.time < nextBlockSpawnTime)
+            return;
+
+        if (landedBlocks == 1)
+        {
+            waitingForNextBlock = false;
+            SpawnBlock();
+            return;
+        }
+
+        if (!towerPresentation.IsSpawnPointAtTarget(lastLandedBlock, spawnPointSettleTolerance))
+            return;
+
         waitingForNextBlock = false;
         SpawnBlock();
     }
 
-    void FollowTower()
-    {
-        if (cameraTransform == null)
-            return;
-
-        if (landedBlocks < 2)
-            return;
-
-        float targetY = cameraStartY + ((landedBlocks - 1) * cameraRisePerBlock);
-
-        Vector3 targetPosition = new Vector3(
-            cameraTransform.transform.position.x,
-            targetY,
-            cameraTransform.transform.position.z
-        );
-
-        cameraTransform.transform.position = Vector3.Lerp(
-            cameraTransform.transform.position,
-            targetPosition,
-            cameraFollowSpeed * Time.deltaTime
-        );
-    }
-
-    void SwayCable()
-    {
-        if (cableRig == null)
-            return;
-
-        if (landedBlocks <= 2)
-        {
-            cableRig.localPosition = Vector3.zero;
-            return;
-        }
-
-        float amplitude = swayAmount + ((landedBlocks - 2) * swayIncreasePerBlock);
-
-        float sway = Mathf.Sin(Time.time * swaySpeed) * amplitude;
-
-        cableRig.localPosition = new Vector3(sway, 0f, 0f);
-    }
-
-    void CheckTowerTilt(Transform landedBlock)
-    {
-        float angle = Mathf.Abs(landedBlock.eulerAngles.z);
-
-        if (angle > 180f)
-            angle = 360f - angle;
-
-        if (angle >= gameOverAngle)
-        {
-            TriggerGameOver(landedBlock);
-        }
-    }
-
+    // Encerramento da partida
     public void TriggerGameOver(Transform landedBlock)
     {
         if (gameOver)
             return;
 
-        gameOver = true;
-
-        Debug.Log("GAME OVER!");
+        FinishGameOver();
 
         Rigidbody2D rb = landedBlock.GetComponent<Rigidbody2D>();
 
@@ -186,9 +186,7 @@ public class TowerManager : MonoBehaviour
         if (gameOver)
             return;
 
-        gameOver = true;
-
-        Debug.Log("GAME OVER!");
+        FinishGameOver();
 
         if (currentBlock != null)
         {
@@ -201,5 +199,24 @@ public class TowerManager : MonoBehaviour
 
             currentBlock = null;
         }
+    }
+
+    private void FinishGameOver()
+    {
+        gameOver = true;
+        waitingForNextBlock = false;
+
+        float elapsedTime = Time.time - gameStartTime;
+        float previousBestTime = PlayerPrefs.GetFloat("TowerUp_BestTime", 0f);
+        int previousBestBlocks = PlayerPrefs.GetInt("TowerUp_BestBlocks", 0);
+
+        gameOverUI.Show(elapsedTime, landedBlocks, previousBestTime, previousBestBlocks);
+        gameHUD.Hide();
+
+        PlayerPrefs.SetFloat("TowerUp_BestTime", Mathf.Max(previousBestTime, elapsedTime));
+        PlayerPrefs.SetInt("TowerUp_BestBlocks", Mathf.Max(previousBestBlocks, landedBlocks));
+        PlayerPrefs.Save();
+
+        Debug.Log("GAME OVER!");
     }
 }

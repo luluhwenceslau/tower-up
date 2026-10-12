@@ -602,6 +602,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1479271986}
   - component: {fileID: 1479271987}
+  - component: {fileID: 1479271988}
   m_Layer: 0
   m_Name: TowerManager
   m_TagString: Untagged
@@ -638,14 +639,37 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NewMonoBehaviourScript
   blockPrefab: {fileID: 8022183073016604396, guid: d24ff3c5ede7445468433c22d3a3cbc9, type: 3}
   spawnPoint: {fileID: 1642263851}
+  blockColors:
+  - {r: 0.86, g: 0.12, b: 0.14, a: 1}
+  - {r: 0.9, g: 0.35, b: 0.03, a: 1}
+  - {r: 0.78, g: 0.54, b: 0.02, a: 1}
+  - {r: 0.78, g: 0.08, b: 0.36, a: 1}
+  - {r: 0.45, g: 0.12, b: 0.68, a: 1}
+  - {r: 0.38, g: 0.56, b: 0.08, a: 1}
+  nextBlockSpawnDelay: 0.1
+  spawnPointSettleTolerance: 0.1
+--- !u!114 &1479271988
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1479271985}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9186d51a78414cf0a1175b4630c3f8c2, type: 3}
+  m_Name: ''
+  m_EditorClassIdentifier: Assembly-CSharp::TowerPresentation
   cameraTransform: {fileID: 519420031}
-  cameraFollowSpeed: 2
-  cameraRisePerBlock: 2.2
+  cameraSmoothTime: 0.3
+  spawnPoint: {fileID: 1642263851}
+  spawnClearanceInBlockHeights: 1.15
+  spawnPointSmoothTime: 0.18
   cableRig: {fileID: 2102850855}
+  cableVisual: {fileID: 1209699233}
   swaySpeed: 1.2
   swayAmount: 0.15
   swayIncreasePerBlock: 0.04
-  gameOverAngle: 30
 --- !u!1 &1642263850
 GameObject:
   m_ObjectHideFlags: 0
