@@ -130,18 +130,21 @@ public class TowerPresentation : MonoBehaviour
 
         float targetY = highestBlock.position.y +
             (GetNominalBlockHeight(highestBlock, towerCollider) * CameraLookAheadInBlockHeights);
+        targetY = Mathf.Max(targetY, cameraTransform.transform.position.y);
         Vector3 targetPosition = new Vector3(
             cameraTransform.transform.position.x,
             targetY,
             cameraTransform.transform.position.z
         );
 
-        cameraTransform.transform.position = Vector3.SmoothDamp(
+        Vector3 smoothedPosition = Vector3.SmoothDamp(
             cameraTransform.transform.position,
             targetPosition,
             ref cameraVelocity,
             cameraSmoothTime
         );
+        smoothedPosition.y = Mathf.Max(smoothedPosition.y, cameraTransform.transform.position.y);
+        cameraTransform.transform.position = smoothedPosition;
     }
 
     private void SwayCable(int landedBlocks)

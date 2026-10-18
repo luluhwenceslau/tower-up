@@ -640,12 +640,20 @@ MonoBehaviour:
   blockPrefab: {fileID: 8022183073016604396, guid: d24ff3c5ede7445468433c22d3a3cbc9, type: 3}
   spawnPoint: {fileID: 1642263851}
   blockColors:
-  - {r: 0.86, g: 0.12, b: 0.14, a: 1}
-  - {r: 0.9, g: 0.35, b: 0.03, a: 1}
-  - {r: 0.78, g: 0.54, b: 0.02, a: 1}
-  - {r: 0.78, g: 0.08, b: 0.36, a: 1}
-  - {r: 0.45, g: 0.12, b: 0.68, a: 1}
-  - {r: 0.38, g: 0.56, b: 0.08, a: 1}
+  - {r: 0.94, g: 0.48, b: 0.48, a: 1}
+  - {r: 1, g: 0.68, b: 0.46, a: 1}
+  - {r: 0.96, g: 0.8, b: 0.44, a: 1}
+  - {r: 0.94, g: 0.55, b: 0.68, a: 1}
+  - {r: 0.68, g: 0.58, b: 0.88, a: 1}
+  - {r: 0.48, g: 0.78, b: 0.62, a: 1}
+  clockIcon: {fileID: 8581363780399802525, guid: 743ac88d24b3a5f4d9f2e4685de325c7, type: 3}
+  windowModels:
+  - {fileID: 7713244077584045223, guid: 995510f3568732b48a80e92a08c9fd4d, type: 3}
+  - {fileID: 58739036923892445, guid: 5af5641c084bc5243a1be284c4e1504a, type: 3}
+  - {fileID: 4658918839677987374, guid: b275660ecac5d704e97004e817dd8d3f, type: 3}
+  cloudSprites:
+  - {fileID: 2900614698156060134, guid: b3501992c4785ee44b4414d17bbe328e, type: 3}
+  - {fileID: 2406723831134214953, guid: f1df68df8136d1045aab149155c27c3b, type: 3}
   nextBlockSpawnDelay: 0.1
   spawnPointSettleTolerance: 0.1
 --- !u!114 &1479271988
@@ -658,7 +666,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9186d51a78414cf0a1175b4630c3f8c2, type: 3}
-  m_Name: ''
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TowerPresentation
   cameraTransform: {fileID: 519420031}
   cameraSmoothTime: 0.3
