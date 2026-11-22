@@ -6,6 +6,7 @@ using System;
 public class GameOverUI : MonoBehaviour
 {
     private bool isVisible;
+    private bool isPausedScreen;
     private float finalTime;
     private int finalBlocks;
     private int finalPerfectStreak;
@@ -27,11 +28,13 @@ public class GameOverUI : MonoBehaviour
     private Texture2D restartButtonTexture;
     private Texture2D restartArrowTexture;
     private Texture2D homeIconTexture;
-    private Texture2D progressBarBackgroundTexture;
-    private Texture2D progressBarFillTexture;
+    private Texture2D playIconTexture;
+    private Texture2D progressCircleTexture;
     private Texture2D panelTexture;
     private int nextAchievement = -1;
     private Action menuAction;
+    private Action restartAction;
+    private Action resumeAction;
     private static readonly Color[] TitleColors =
     {
         new Color(1f, 0.48f, 0.50f),
@@ -60,7 +63,12 @@ public class GameOverUI : MonoBehaviour
         unknownAchievementBadge = unknownBadge;
     }
 
-    public void SetMenuAction(Action action) { menuAction = action; }
+    public void SetActions(Action onRestart, Action onMenu, Action onResume)
+    {
+        restartAction = onRestart;
+        menuAction = onMenu;
+        resumeAction = onResume;
+    }
     public void Hide() { isVisible = false; }
 
     public void Show(
@@ -74,6 +82,7 @@ public class GameOverUI : MonoBehaviour
     )
     {
         isVisible = true;
+        isPausedScreen = false;
         finalTime = elapsedTime;
         finalBlocks = blocks;
         finalPerfectStreak = perfectStreak;
@@ -81,6 +90,15 @@ public class GameOverUI : MonoBehaviour
         previousBestBlocks = bestBlocks;
         previousBestPerfectStreak = bestPerfectStreak;
         nextAchievement = nextAchievementIndex;
+    }
+
+    public void ShowPaused(float elapsedTime, int blocks, int perfectStreak)
+    {
+        isVisible = true;
+        isPausedScreen = true;
+        finalTime = elapsedTime;
+        finalBlocks = blocks;
+        finalPerfectStreak = perfectStreak;
     }
 
     private void OnGUI()
@@ -100,37 +118,53 @@ public class GameOverUI : MonoBehaviour
         float bottom = panel.yMax - padding;
         float y = panel.y + padding;
         float titleHeight = Mathf.Clamp(panelHeight * 0.15f, 88f, 140f);
-        titleStyle.fontSize = Mathf.RoundToInt(Mathf.Clamp(panelWidth / 10f, 48f, 78f));
+        titleStyle.fontSize = Mathf.RoundToInt(Mathf.Clamp(panelWidth / 8.5f, 54f, 88f));
         outlineStyle.fontSize = titleStyle.fontSize;
-        DrawColorfulTitle("GAME OVER", y, titleHeight);
+        DrawColorfulTitle(isPausedScreen ? "PAUSED" : "GAME OVER", y, titleHeight);
         y += titleHeight + gap;
 
-        float metricsHeight = Mathf.Clamp(panelHeight * 0.11f, 68f, 92f);
+        float metricsHeight = isPausedScreen
+            ? Mathf.Clamp(panelHeight * 0.18f, 78f, 116f)
+            : Mathf.Clamp(panelHeight * 0.13f, 74f, 106f);
         DrawMetricColumns(new[] { FormatTime(finalTime), finalBlocks.ToString(), finalPerfectStreak.ToString() }, y, metricsHeight, resultStyle, 48f);
         y += metricsHeight + gap * 0.65f;
-        float dividerHeight = 34f;
-        DrawRecordDivider(y, dividerHeight);
-        y += dividerHeight + gap * 0.65f;
-
-        float recordsHeight = Mathf.Clamp(panelHeight * 0.1f, 56f, 76f);
-        DrawMetricColumns(new[]
+        if (!isPausedScreen)
         {
-            previousBestTime > 0f ? FormatTime(previousBestTime) : "--:--",
-            previousBestBlocks > 0 ? previousBestBlocks.ToString() : "--",
-            previousBestPerfectStreak > 0 ? previousBestPerfectStreak.ToString() : "--"
-        }, y, recordsHeight, recordStyle, 40f);
-        y += recordsHeight + gap;
+            float dividerHeight = 34f;
+            DrawRecordDivider(y, dividerHeight);
+            y += dividerHeight + gap * 0.65f;
+
+            float recordsHeight = Mathf.Clamp(panelHeight * 0.11f, 58f, 84f);
+            DrawMetricColumns(new[]
+            {
+                previousBestTime > 0f ? FormatTime(previousBestTime) : "--:--",
+                previousBestBlocks > 0 ? previousBestBlocks.ToString() : "--",
+                previousBestPerfectStreak > 0 ? previousBestPerfectStreak.ToString() : "--"
+            }, y, recordsHeight, recordStyle, 40f);
+            y += recordsHeight + gap;
+        }
 
         float gridWidth = panelWidth - padding * 2f;
-        float restartSize = Mathf.Clamp(panelWidth * 0.14f, 106f, 150f);
-        float restartY = bottom - restartSize;
-        Rect nextRect = new Rect(panel.x + padding, y, gridWidth, Mathf.Max(100f, restartY - y - gap));
-        DrawNextAchievement(nextRect);
         float buttonGap = Mathf.Clamp(panelWidth * 0.025f, 14f, 24f);
-        float buttonGroupWidth = restartSize * 2f + buttonGap;
+        float restartSize = isPausedScreen
+            ? Mathf.Clamp((panelWidth - padding * 2f - buttonGap * 2f) / 3f, 58f, 106f)
+            : Mathf.Clamp(panelWidth * 0.14f, 106f, 150f);
+        float restartY = bottom - restartSize;
+        if (!isPausedScreen)
+        {
+            Rect nextRect = new Rect(panel.x + padding, y, gridWidth, Mathf.Max(100f, restartY - y - gap));
+            DrawNextAchievement(nextRect);
+        }
+        int buttonCount = isPausedScreen ? 3 : 2;
+        float buttonGroupWidth = restartSize * buttonCount + buttonGap * (buttonCount - 1);
         float buttonGroupX = panel.center.x - buttonGroupWidth * 0.5f;
         DrawHomeButton(buttonGroupX, restartY, restartSize);
-        DrawRestartButton(buttonGroupX + restartSize + buttonGap, restartY, restartSize);
+        if (isPausedScreen)
+        {
+            DrawResumeButton(buttonGroupX + restartSize + buttonGap, restartY, restartSize);
+            DrawRestartButton(buttonGroupX + (restartSize + buttonGap) * 2f, restartY, restartSize);
+        }
+        else DrawRestartButton(buttonGroupX + restartSize + buttonGap, restartY, restartSize);
     }
 
     private void DrawNextAchievement(Rect rect)
@@ -146,11 +180,14 @@ public class GameOverUI : MonoBehaviour
             return;
         }
         float padding = Mathf.Clamp(rect.width * 0.04f, 12f, 28f);
-        int headingSize = Mathf.RoundToInt(Mathf.Clamp(Mathf.Min(rect.width * 0.075f, rect.height * 0.22f), 22f, 42f));
-        GUIStyle nextStyle = new GUIStyle(dividerStyle) { fontSize = headingSize };
-        GUI.Label(new Rect(rect.x + padding, rect.y + rect.height * 0.02f, rect.width - padding * 2f, rect.height * 0.18f), "NEXT ACHIEVEMENT", nextStyle);
-        float badgeSize = Mathf.RoundToInt(Mathf.Clamp(rect.height * 0.34f, 34f, 66f));
-        float contentWidth = badgeSize + 24f + 80f;
+        int headingSize = Mathf.RoundToInt(Mathf.Clamp(Mathf.Min(rect.width * 0.095f, rect.height * 0.27f), 26f, 48f));
+        GUIStyle nextStyle = new GUIStyle(dividerStyle) { fontSize = headingSize, normal = { textColor = Color.white } };
+        Rect nextTitleRect = new Rect(rect.x + padding, rect.y + rect.height * 0.02f, rect.width - padding * 2f, rect.height * 0.18f);
+        float nextTitleWidth = nextStyle.CalcSize(new GUIContent("NEXT ACHIEVEMENT")).x;
+        if (nextTitleWidth > nextTitleRect.width) nextStyle.fontSize = Mathf.Max(20, Mathf.RoundToInt(nextStyle.fontSize * nextTitleRect.width / nextTitleWidth));
+        GUI.Label(nextTitleRect, "NEXT ACHIEVEMENT", nextStyle);
+        float badgeSize = Mathf.RoundToInt(Mathf.Clamp(rect.height * 0.30f, 32f, 66f));
+        float contentWidth = badgeSize + 8f + 92f;
         float contentX = rect.center.x - contentWidth * 0.5f;
         Sprite badge = !MilestoneAnnouncer.IsUnlocked(nextAchievement) && unknownAchievementBadge != null
             ? unknownAchievementBadge
@@ -158,34 +195,35 @@ public class GameOverUI : MonoBehaviour
                 ? achievementBadges[nextAchievement]
                 : unknownAchievementBadge;
         if (badge != null)
-            GameHUD.DrawSpriteIcon(badge, new Rect(contentX, rect.y + rect.height * 0.22f, badgeSize, badgeSize));
+            GameHUD.DrawSpriteIcon(badge, new Rect(contentX, rect.y + rect.height * 0.32f, badgeSize, badgeSize));
         GUIStyle mysteryStyle = new GUIStyle(achievementStyle)
         {
             alignment = TextAnchor.MiddleCenter,
             fontSize = Mathf.RoundToInt(Mathf.Clamp(Mathf.Min(rect.width * 0.14f, rect.height * 0.36f), 28f, 52f))
         };
-        GUI.Label(new Rect(contentX + badgeSize + 24f, rect.y + rect.height * 0.22f, 80f, badgeSize), "??", mysteryStyle);
-        GUIStyle targetStyle = new GUIStyle(achievementStyle)
-        {
-            fontSize = Mathf.RoundToInt(Mathf.Clamp(Mathf.Min(rect.width * 0.075f, rect.height * 0.22f), 20f, 32f)),
-            alignment = TextAnchor.MiddleCenter
-        };
-        GUI.Label(new Rect(rect.x + padding, rect.y + rect.height * 0.57f, rect.width - padding * 2f, rect.height * 0.18f), MilestoneAnnouncer.GetTargetText(nextAchievement), targetStyle);
+        Rect mysteryRect = new Rect(contentX + badgeSize + 8f, rect.y + rect.height * 0.32f, 92f, badgeSize);
+        float mysteryWidth = mysteryStyle.CalcSize(new GUIContent("??")).x;
+        if (mysteryWidth > mysteryRect.width) mysteryStyle.fontSize = Mathf.Max(24, Mathf.RoundToInt(mysteryStyle.fontSize * mysteryRect.width / mysteryWidth));
+        GUI.Label(mysteryRect, "??", mysteryStyle);
         float progress = MilestoneAnnouncer.GetProgress(nextAchievement, finalBlocks, finalPerfectStreak);
-        float barHeight = Mathf.RoundToInt(Mathf.Clamp(rect.height * 0.13f, 12f, 22f));
-        Rect bar = new Rect(rect.x + padding, rect.y + rect.height * 0.84f, rect.width - padding * 2f, barHeight);
-        GUI.DrawTexture(bar, progressBarBackgroundTexture, ScaleMode.StretchToFill, true);
-        GUI.color = new Color(1f, 0.77f, 0.34f, 1f);
+        float barHeight = Mathf.RoundToInt(Mathf.Clamp(rect.height * 0.17f, 16f, 28f));
+        Rect bar = new Rect(rect.x + padding, rect.y + rect.height * 0.64f, rect.width - padding * 2f, barHeight);
+        DrawPill(bar, new Color(0.04f, 0.07f, 0.12f, 1f));
+        GUI.color = Color.white;
         float fillWidth = bar.width * progress;
         if (fillWidth > 0f)
-            GUI.DrawTexture(new Rect(bar.x, bar.y, fillWidth, bar.height), progressBarFillTexture, ScaleMode.StretchToFill, true);
+            DrawPill(new Rect(bar.x, bar.y, fillWidth, bar.height), Color.white);
         GUI.color = Color.white;
         GUIStyle progressStyle = new GUIStyle(achievementStyle)
         {
-            fontSize = Mathf.RoundToInt(Mathf.Clamp(Mathf.Min(rect.width * 0.075f, rect.height * 0.2f), 20f, 32f)),
+            fontSize = Mathf.RoundToInt(Mathf.Clamp(Mathf.Min(rect.width * 0.09f, rect.height * 0.22f), 24f, 36f)),
             alignment = TextAnchor.MiddleCenter
         };
-        GUI.Label(new Rect(bar.x, rect.y + rect.height * 0.63f, bar.width, rect.height * 0.18f), MilestoneAnnouncer.GetProgressText(nextAchievement, finalBlocks, finalPerfectStreak), progressStyle);
+        Rect progressRect = new Rect(bar.x, rect.y + rect.height * 0.84f, bar.width, rect.height * 0.13f);
+        string progressText = MilestoneAnnouncer.GetCompactProgressText(nextAchievement, finalBlocks, finalPerfectStreak);
+        float progressTextWidth = progressStyle.CalcSize(new GUIContent(progressText)).x;
+        if (progressTextWidth > progressRect.width) progressStyle.fontSize = Mathf.Max(20, Mathf.RoundToInt(progressStyle.fontSize * progressRect.width / progressTextWidth));
+        GUI.Label(progressRect, progressText, progressStyle);
         GUI.color = old;
     }
 
@@ -232,8 +270,8 @@ public class GameOverUI : MonoBehaviour
         restartButtonTexture = CreateCartoonButtonTexture();
         restartArrowTexture = CreateRestartArrowTexture();
         homeIconTexture = CreateHomeIconTexture();
-        progressBarBackgroundTexture = CreatePillTexture(new Color(0.04f, 0.07f, 0.12f, 1f));
-        progressBarFillTexture = CreatePillTexture(Color.white);
+        playIconTexture = CreatePlayIconTexture();
+        progressCircleTexture = CreateProgressCircleTexture();
         achievementStyle = new GUIStyle(GUI.skin.label)
         {
             alignment = TextAnchor.MiddleCenter,
@@ -260,6 +298,9 @@ public class GameOverUI : MonoBehaviour
             Rect rect = new Rect(x, y, width, height);
 
             outlineStyle.normal.textColor = Color.black;
+            outlineStyle.hover.textColor = Color.black;
+            outlineStyle.active.textColor = Color.black;
+            outlineStyle.focused.textColor = Color.black;
             for (int offsetX = -2; offsetX <= 2; offsetX++)
             for (int offsetY = -2; offsetY <= 2; offsetY++)
             {
@@ -267,7 +308,11 @@ public class GameOverUI : MonoBehaviour
                     GUI.Label(new Rect(x + offsetX, y + offsetY, width, height), character, outlineStyle);
             }
 
-            titleStyle.normal.textColor = TitleColors[i % TitleColors.Length];
+            Color letterColor = TitleColors[i % TitleColors.Length];
+            titleStyle.normal.textColor = letterColor;
+            titleStyle.hover.textColor = letterColor;
+            titleStyle.active.textColor = letterColor;
+            titleStyle.focused.textColor = letterColor;
             GUI.Label(rect, character, titleStyle);
             x += width;
         }
@@ -281,8 +326,8 @@ public class GameOverUI : MonoBehaviour
         for (int i = 0; i < 3; i++)
         {
             float centerX = panel.x + padding + columnWidth * (i + 0.5f);
-            float displayedIconSize = Mathf.Min(iconSize, columnWidth * 0.36f, rowHeight * 0.38f);
-            Rect iconRect = new Rect(centerX - displayedIconSize * 0.5f, y + rowHeight * 0.08f, displayedIconSize, displayedIconSize);
+            float displayedIconSize = Mathf.Min(iconSize, columnWidth * 0.45f, rowHeight * 0.38f);
+            Rect iconRect = new Rect(centerX - displayedIconSize * 0.5f, y + rowHeight * 0.06f, displayedIconSize, displayedIconSize);
             if (i == 0) GameHUD.DrawSpriteIcon(clockIcon, iconRect);
             else if (i == 1) GameHUD.DrawSpriteIcon(blockIcon, iconRect);
             else
@@ -290,13 +335,13 @@ public class GameOverUI : MonoBehaviour
                 metricStarStyle.fontSize = Mathf.RoundToInt(displayedIconSize * 0.9f);
                 GUI.Label(iconRect, "★", metricStarStyle);
             }
-            float fitFontSize = columnWidth / Mathf.Max(2f, values[i].Length * 0.62f);
+            float fitFontSize = columnWidth / Mathf.Max(2f, values[i].Length * 0.56f);
             GUIStyle valueStyle = new GUIStyle(style)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = Mathf.RoundToInt(Mathf.Clamp(Mathf.Min(style.fontSize, fitFontSize, rowHeight * 0.42f), 18f, 42f))
+                fontSize = Mathf.RoundToInt(Mathf.Clamp(Mathf.Min(style.fontSize, fitFontSize, rowHeight * 0.42f), 18f, 46f))
             };
-            GUI.Label(new Rect(centerX - columnWidth * 0.5f, y + rowHeight * 0.52f, columnWidth, rowHeight * 0.44f), values[i], valueStyle);
+            GUI.Label(new Rect(centerX - columnWidth * 0.5f, y + rowHeight * 0.58f, columnWidth, rowHeight * 0.39f), values[i], valueStyle);
         }
     }
 
@@ -328,7 +373,7 @@ public class GameOverUI : MonoBehaviour
 
     private static float GetPanelPadding(float panelWidth)
     {
-        return Mathf.Clamp(panelWidth * 0.105f, 38f, 92f);
+        return Mathf.Clamp(panelWidth * 0.065f, 18f, 72f);
     }
 
     private static Texture2D CreatePanelTexture()
@@ -382,10 +427,9 @@ public class GameOverUI : MonoBehaviour
         GUI.DrawTexture(drawRect, restartButtonTexture);
         GUI.color = previousColor;
 
-        GUI.DrawTexture(Inset(drawRect, 25f), restartArrowTexture, ScaleMode.ScaleToFit, true);
+        GUI.DrawTexture(Inset(drawRect, size * 0.22f), restartArrowTexture, ScaleMode.ScaleToFit, true);
 
-        if (clicked)
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        if (clicked) restartAction?.Invoke();
     }
 
     private void DrawHomeButton(float x, float y, float size)
@@ -401,8 +445,25 @@ public class GameOverUI : MonoBehaviour
         GUI.color = hovered ? new Color(1.12f, 1.12f, 1.12f, 1f) : Color.white;
         GUI.DrawTexture(drawRect, restartButtonTexture);
         GUI.color = previousColor;
-        GUI.DrawTexture(Inset(drawRect, 25f), homeIconTexture, ScaleMode.ScaleToFit, true);
+        GUI.DrawTexture(Inset(drawRect, size * 0.22f), homeIconTexture, ScaleMode.ScaleToFit, true);
         if (clicked) menuAction?.Invoke();
+    }
+
+    private void DrawResumeButton(float x, float y, float size)
+    {
+        Rect buttonRect = new Rect(x, y, size, size);
+        bool hovered = buttonRect.Contains(Event.current.mousePosition);
+        bool clicked = GUI.Button(buttonRect, GUIContent.none, GUIStyle.none);
+        bool pressed = Event.current.type == EventType.MouseDown && buttonRect.Contains(Event.current.mousePosition);
+        Rect drawRect = pressed ? new Rect(buttonRect.x, buttonRect.y + 3f, size, size) : buttonRect;
+        Color previousColor = GUI.color;
+        GUI.color = new Color(0.18f, 0.12f, 0.09f, 0.45f);
+        GUI.DrawTexture(new Rect(drawRect.x, drawRect.y + 7f, size, size), restartButtonTexture);
+        GUI.color = hovered ? new Color(1.12f, 1.12f, 1.12f, 1f) : Color.white;
+        GUI.DrawTexture(drawRect, restartButtonTexture);
+        GUI.color = previousColor;
+        GUI.DrawTexture(Inset(drawRect, size * 0.22f), playIconTexture, ScaleMode.ScaleToFit, true);
+        if (clicked) resumeAction?.Invoke();
     }
 
     private static Rect Inset(Rect rect, float amount)
@@ -540,23 +601,62 @@ public class GameOverUI : MonoBehaviour
         return texture;
     }
 
-    private static Texture2D CreatePillTexture(Color color)
+    private static Texture2D CreatePlayIconTexture()
     {
-        const int width = 128;
-        const int height = 48;
-        var pixels = new Color32[width * height];
-        float radius = height * 0.5f;
-        for (int y = 0; y < height; y++)
-        for (int x = 0; x < width; x++)
+        const int size = 64;
+        var pixels = new Color32[size * size];
+        Color32 white = new Color32(255, 255, 255, 255);
+        Vector2 a = new Vector2(19f, 10f);
+        Vector2 b = new Vector2(19f, 54f);
+        Vector2 c = new Vector2(54f, 32f);
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+            if (IsInsideTriangle(new Vector2(x, y), a, b, c))
+                pixels[(size - 1 - y) * size + x] = white;
+        var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
         {
-            float dx = Mathf.Max(Mathf.Abs(x - (width - 1) * 0.5f) - (width * 0.5f - radius), 0f);
-            float dy = Mathf.Max(Mathf.Abs(y - (height - 1) * 0.5f) - (height * 0.5f - radius), 0f);
-            float distance = Mathf.Sqrt(dx * dx + dy * dy) + Mathf.Min(Mathf.Max(
-                Mathf.Abs(x - (width - 1) * 0.5f) - (width * 0.5f - radius),
-                Mathf.Abs(y - (height - 1) * 0.5f) - (height * 0.5f - radius)), 0f) - radius;
-            if (distance <= 0f) pixels[y * width + x] = color;
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp,
+            hideFlags = HideFlags.HideAndDontSave
+        };
+        texture.SetPixels32(pixels);
+        texture.Apply(false, true);
+        return texture;
+    }
+
+    private void DrawPill(Rect rect, Color color)
+    {
+        if (rect.width <= 0f || rect.height <= 0f || progressCircleTexture == null) return;
+        Color previous = GUI.color;
+        GUI.color = color;
+        float diameter = Mathf.Min(rect.height, rect.width);
+        if (rect.width <= rect.height)
+        {
+            GUI.DrawTexture(new Rect(rect.center.x - diameter * 0.5f, rect.center.y - diameter * 0.5f, diameter, diameter), progressCircleTexture);
         }
-        var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+        else
+        {
+            GUI.DrawTexture(new Rect(rect.x + diameter * 0.5f, rect.y, rect.width - diameter, rect.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.x, rect.y, diameter, diameter), progressCircleTexture);
+            GUI.DrawTexture(new Rect(rect.xMax - diameter, rect.y, diameter, diameter), progressCircleTexture);
+        }
+        GUI.color = previous;
+    }
+
+    private static Texture2D CreateProgressCircleTexture()
+    {
+        const int size = 64;
+        var pixels = new Color32[size * size];
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float radius = size * 0.5f - 1f;
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float distance = Vector2.Distance(new Vector2(x, y), center);
+            float alpha = Mathf.Clamp01(radius + 0.75f - distance);
+            pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
+        }
+        var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
         {
             filterMode = FilterMode.Bilinear,
             wrapMode = TextureWrapMode.Clamp,
@@ -589,10 +689,10 @@ public class GameOverUI : MonoBehaviour
             Destroy(restartArrowTexture);
         if (homeIconTexture != null)
             Destroy(homeIconTexture);
-        if (progressBarBackgroundTexture != null)
-            Destroy(progressBarBackgroundTexture);
-        if (progressBarFillTexture != null)
-            Destroy(progressBarFillTexture);
+        if (playIconTexture != null)
+            Destroy(playIconTexture);
+        if (progressCircleTexture != null)
+            Destroy(progressCircleTexture);
         if (panelTexture != null)
             Destroy(panelTexture);
     }

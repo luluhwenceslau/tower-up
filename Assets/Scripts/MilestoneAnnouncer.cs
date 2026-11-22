@@ -64,6 +64,27 @@ public class MilestoneAnnouncer : MonoBehaviour
         return Mathf.Min(PlayerPrefs.GetInt("TowerUp_GamesPlayed", 0), 10) + " / 10 games";
     }
 
+    public static string GetCompactProgressText(int index, int floors, int streak)
+    {
+        if (index < Floors.Length)
+        {
+            int current = Mathf.Min(PlayerPrefs.GetInt("TowerUp_BestBlocks", floors), Floors[index]);
+            return current + " / " + Floors[index];
+        }
+        if (index == 5) return IsUnlocked(index) ? "1 / 1" : "0 / 1";
+        if (index == 6) return Mathf.Min(PlayerPrefs.GetInt("TowerUp_BestPerfectStreak", streak), 5) + " / 5";
+        return Mathf.Min(PlayerPrefs.GetInt("TowerUp_GamesPlayed", 0), 10) + " / 10";
+    }
+
+    public static string GetCurrentProgressText(int index, int floors, int streak)
+    {
+        if (index < Floors.Length)
+            return Mathf.Min(PlayerPrefs.GetInt("TowerUp_BestBlocks", floors), Floors[index]) + " REACHED";
+        if (index == 5) return IsUnlocked(index) ? "1 DONE" : "0 DONE";
+        if (index == 6) return Mathf.Min(PlayerPrefs.GetInt("TowerUp_BestPerfectStreak", streak), 5) + " DONE";
+        return Mathf.Min(PlayerPrefs.GetInt("TowerUp_GamesPlayed", 0), 10) + " DONE";
+    }
+
     public static void Unlock(int index)
     {
         PlayerPrefs.SetInt(GetKey(index), 1);
@@ -105,9 +126,9 @@ public class MilestoneAnnouncer : MonoBehaviour
     public static string GetTargetText(int index)
     {
         if (IsFloorAchievement(index)) return Floors[index] + " FLOORS";
-        if (index == 6) return "5 PERFECT PLACEMENTS";
+        if (index == 6) return "5 PERFECTS";
         if (index == 7) return "10 GAMES";
-        return "1 PERFECT PLACEMENT";
+        return "1 PERFECT";
     }
 
     public void UpdateProgress(int landedBlocks)

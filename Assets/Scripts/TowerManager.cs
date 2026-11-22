@@ -6,6 +6,7 @@ using UnityEngine.SceneManagement;
 public class TowerManager : MonoBehaviour
 {
     private const float PerfectFitHorizontalTolerance = 0.025f;
+    private static bool startRunAfterSceneReload;
 
     [Header("Blocos")]
     public GameObject blockPrefab;
@@ -50,6 +51,7 @@ public class TowerManager : MonoBehaviour
     private int landedBlocks = 0;
     private int perfectStreak = 0;
     private int bestPerfectStreakThisRun = 0;
+    private int perfectPlacementsThisRun;
     private Transform lastLandedBlock;
     private float nextBlockSpawnTime;
     private int previousColorIndex = -1;
@@ -59,6 +61,7 @@ public class TowerManager : MonoBehaviour
     private readonly List<Rigidbody2D> landedBodies = new List<Rigidbody2D>();
 
     private bool gameOver = false;
+    private bool gamePaused;
     private GameOverUI gameOverUI;
     private GameHUD gameHUD;
     private TowerPresentation towerPresentation;
@@ -93,7 +96,8 @@ public class TowerManager : MonoBehaviour
         mainMenuUI = GetComponent<MainMenuUI>();
         if (mainMenuUI == null) mainMenuUI = gameObject.AddComponent<MainMenuUI>();
         mainMenuUI.Initialize(this, achievementBadges, unknownAchievementBadge);
-        gameOverUI.SetMenuAction(ShowMainMenu);
+        gameOverUI.SetActions(RestartGame, ShowMainMenu, ResumeGame);
+        gameHUD.SetPauseAction(PauseGame);
         gameHUD.Hide();
 
         AudioSource[] audioSources = GetComponents<AudioSource>();
@@ -139,19 +143,28 @@ public class TowerManager : MonoBehaviour
     // Inicialização e atualização do jogo
     void Start()
     {
+        if (mainSong != null) musicSource.Play();
+        if (startRunAfterSceneReload)
+        {
+            startRunAfterSceneReload = false;
+            StartGame();
+            return;
+        }
         mainMenuUI.Show();
         menuBackdrop.SetVisible(true);
         cloudBackground.SetMenuMode(true);
         SetCableVisible(false);
-        if (mainSong != null) musicSource.Play();
     }
 
     public void StartGame()
     {
+        Time.timeScale = 1f;
         gameOver = false;
+        gamePaused = false;
         landedBlocks = 0;
         perfectStreak = 0;
         bestPerfectStreakThisRun = 0;
+        perfectPlacementsThisRun = 0;
         landedBodies.Clear();
         lastLandedBlock = null;
         milestoneAnnouncer.ResetRun();
@@ -176,12 +189,38 @@ public class TowerManager : MonoBehaviour
 
     public void ShowMainMenu()
     {
+        Time.timeScale = 1f;
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+
+    public void RestartGame()
+    {
+        Time.timeScale = 1f;
+        startRunAfterSceneReload = true;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+
+    private void PauseGame()
+    {
+        if (gameOver || gamePaused || mainMenuUI.IsVisible) return;
+        gamePaused = true;
+        gameHUD.Hide();
+        gameOverUI.ShowPaused(Time.time - gameStartTime, landedBlocks, perfectPlacementsThisRun);
+        Time.timeScale = 0f;
+    }
+
+    private void ResumeGame()
+    {
+        if (!gamePaused) return;
+        gamePaused = false;
+        Time.timeScale = 1f;
+        gameOverUI.Hide();
+        gameHUD.Show();
     }
 
     void Update()
     {
-        if (gameOver)
+        if (gameOver || gamePaused)
             return;
 
         if (mainMenuUI.IsVisible)
@@ -321,6 +360,7 @@ public class TowerManager : MonoBehaviour
         PlaySoundEffect(blockPlacedSound, 0.75f);
         if (isPerfectFit)
         {
+            perfectPlacementsThisRun++;
             PlaySoundEffect(perfectPlacementSound, 0.9f);
             perfectStreak++;
             bestPerfectStreakThisRun = Mathf.Max(bestPerfectStreakThisRun, perfectStreak);
@@ -488,6 +528,8 @@ public class TowerManager : MonoBehaviour
 
     private void FinishGameOver()
     {
+        Time.timeScale = 1f;
+        gamePaused = false;
         gameOver = true;
         waitingForNextBlock = false;
         milestoneAnnouncer.Hide();

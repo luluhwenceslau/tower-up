@@ -33,6 +33,8 @@ public class MainMenuUI : MonoBehaviour
     private Texture2D trophyIconTexture;
     private Texture2D hamburgerIconTexture;
     private Texture2D roundButtonTexture;
+    private Texture2D homeIconTexture;
+    private Texture2D gamepadIconTexture;
 
     public bool IsVisible => visible;
     public void Initialize(TowerManager towerManager, Sprite[] badges, Sprite unknownBadge)
@@ -53,49 +55,18 @@ public class MainMenuUI : MonoBehaviour
         GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
         GUI.color = Color.white;
 
-        float panelWidth = Mathf.Min(Screen.width * 0.9f, 980f);
-        float panelHeight = Mathf.Min(Screen.height * 0.94f, 1040f);
-        Rect panel = new Rect((Screen.width - panelWidth) * 0.5f, (Screen.height - panelHeight) * 0.5f, panelWidth, panelHeight);
-        float padding = Mathf.Clamp(panelWidth * 0.075f, 28f, 72f);
-
         if (!showStats)
         {
             float titleHeight = Mathf.Clamp(Screen.height * 0.18f, 110f, 190f);
             DrawColorfulTitle("TOWER UP", Screen.height * 0.26f, titleHeight);
-            DrawHome(new Rect(0f, 0f, Screen.width, Screen.height), padding);
+            DrawHome(new Rect(0f, 0f, Screen.width, Screen.height), Mathf.Clamp(Screen.width * 0.075f, 22f, 72f));
             return;
         }
 
-        GUI.DrawTexture(panel, panelTexture, ScaleMode.StretchToFill, true);
-        float statsTitleHeight = Mathf.Clamp(panelHeight * 0.17f, 82f, 138f);
-        DrawColorfulTitle("TOWER UP", panel.y + padding * 0.3f, statsTitleHeight);
-
-        float tabsY = panel.y + padding + statsTitleHeight;
-        float tabGap = Mathf.Clamp(panelWidth * 0.025f, 14f, 28f);
-        float tabWidth = (panelWidth - padding * 2f - tabGap) * 0.5f;
-        float tabHeight = Mathf.Clamp(panelHeight * 0.09f, 58f, 78f);
-        DrawTab(new Rect(panel.x + padding, tabsY, tabWidth, tabHeight), "RECORDS", 0);
-        DrawTab(new Rect(panel.x + padding + tabWidth + tabGap, tabsY, tabWidth, tabHeight), "ACHIEVEMENTS", 1);
-
-        float playHeight = Mathf.Clamp(panelHeight * 0.12f, 76f, 106f);
-        Rect playRect = new Rect(panel.center.x - Mathf.Min(panelWidth * 0.28f, 250f), panel.yMax - padding - playHeight,
-            Mathf.Min(panelWidth * 0.56f, 500f), playHeight);
-        Rect contentRect = new Rect(panel.x + padding, tabsY + tabHeight + tabGap,
-            panelWidth - padding * 2f, playRect.y - (tabsY + tabHeight + tabGap) - tabGap);
-
-        if (tab == 0) DrawRecords(contentRect);
-        else DrawAchievements(contentRect);
-
-        bool playHovered = playRect.Contains(Event.current.mousePosition);
-        GUI.color = playHovered ? new Color(1.12f, 1.12f, 1.12f, 1f) : Color.white;
-        Rect raisedPlayRect = Event.current.type == EventType.MouseDown && playHovered
-            ? new Rect(playRect.x, playRect.y + 4f, playRect.width, playRect.height)
-            : playRect;
-        GUI.DrawTexture(new Rect(raisedPlayRect.x, raisedPlayRect.y + 7f, raisedPlayRect.width, raisedPlayRect.height), buttonTexture);
-        GUI.DrawTexture(raisedPlayRect, buttonTexture);
-        GUI.color = Color.white;
-        GUI.Label(raisedPlayRect, "BACK", headingStyle);
-        if (GUI.Button(playRect, GUIContent.none, GUIStyle.none)) showStats = false;
+        if (tab == 1)
+            DrawAchievementsFullScreen();
+        else
+            DrawRecordsFullScreen();
     }
 
     private void DrawHome(Rect screen, float padding)
@@ -110,6 +81,136 @@ public class MainMenuUI : MonoBehaviour
         DrawIconButton(trophyRect, trophyIconTexture, () => { showStats = true; tab = 0; });
         Rect hamburgerRect = new Rect(trophyRect.x, trophyRect.yMax + 10f, trophySize, trophySize);
         DrawIconButton(hamburgerRect, hamburgerIconTexture, () => { showStats = true; tab = 1; });
+    }
+
+    private void DrawRecordsFullScreen()
+    {
+        float margin = Mathf.Clamp(Screen.width * 0.055f, 18f, 56f);
+        float titleHeight = Mathf.Clamp(Screen.height * 0.16f, 104f, 168f);
+        DrawColorfulTitle("TOWER UP", Screen.height * 0.015f, titleHeight);
+
+        float backHeight = Mathf.Clamp(Mathf.Min(Screen.width * 0.9f, 980f) * 0.14f, 106f, 150f);
+        float availableFrameHeight = Screen.height - titleHeight - backHeight - margin * 2f;
+        float frameHeight = Screen.height > Screen.width
+            ? Mathf.Min(availableFrameHeight, Screen.width * 1.05f)
+            : availableFrameHeight;
+        Rect frame = new Rect(margin, titleHeight + margin * 0.75f, Screen.width - margin * 2f, frameHeight);
+        DrawSimplePanel(frame);
+
+        float inset = Mathf.Clamp(frame.width * 0.055f, 14f, 40f);
+        float gap = Mathf.Clamp(frame.width * 0.035f, 10f, 24f);
+        float cellWidth = (frame.width - inset * 2f - gap) * 0.5f;
+        float cellHeight = Mathf.Min((frame.height - inset * 2f - gap) * 0.5f, cellWidth * 0.82f);
+        string[] values =
+        {
+            PlayerPrefs.GetInt("TowerUp_BestBlocks", 0).ToString(),
+            FormatTime(PlayerPrefs.GetFloat("TowerUp_BestTime", 0f)),
+            PlayerPrefs.GetInt("TowerUp_BestPerfectStreak", 0).ToString(),
+            PlayerPrefs.GetInt("TowerUp_GamesPlayed", 0).ToString()
+        };
+
+        for (int i = 0; i < values.Length; i++)
+        {
+            int column = i % 2;
+            int row = i / 2;
+            Rect card = new Rect(frame.x + inset + column * (cellWidth + gap), frame.y + inset + row * (cellHeight + gap), cellWidth, cellHeight);
+            DrawSimpleCard(card);
+            float iconSize = Mathf.Clamp(Mathf.Min(card.width * 0.34f, card.height * 0.40f), 40f, 92f);
+            Rect iconRect = new Rect(card.center.x - iconSize * 0.5f, card.y + card.height * 0.11f, iconSize, iconSize);
+            DrawRecordIcon(i, iconRect);
+
+            GUIStyle valueStyle = new GUIStyle(headingStyle)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = Mathf.RoundToInt(Mathf.Clamp(Mathf.Min(card.height * 0.34f, card.width * 0.25f), 28f, 58f)),
+                normal = { textColor = Color.white }
+            };
+            Rect valueRect = new Rect(card.x + 8f, card.y + card.height * 0.58f, card.width - 16f, card.height * 0.34f);
+            float valueTextWidth = valueStyle.CalcSize(new GUIContent(values[i])).x;
+            if (valueTextWidth > valueRect.width) valueStyle.fontSize = Mathf.Max(22, Mathf.RoundToInt(valueStyle.fontSize * valueRect.width / valueTextWidth));
+            GUI.Label(valueRect, values[i], valueStyle);
+        }
+
+        float homeSize = Mathf.Clamp(Mathf.Min(Screen.width * 0.9f, 980f) * 0.14f, 106f, 150f);
+        Rect homeRect = new Rect((Screen.width - homeSize) * 0.5f, Screen.height - homeSize - margin * 0.3f, homeSize, homeSize);
+        DrawHomeNavigationButton(homeRect);
+        if (GUI.Button(homeRect, GUIContent.none, GUIStyle.none)) showStats = false;
+    }
+
+    private void DrawRecordIcon(int index, Rect rect)
+    {
+        if (index == 0)
+        {
+            SpriteRenderer blockRenderer = manager != null && manager.blockPrefab != null ? manager.blockPrefab.GetComponent<SpriteRenderer>() : null;
+            GameHUD.DrawSpriteIcon(blockRenderer != null ? blockRenderer.sprite : null, rect);
+        }
+        else if (index == 1)
+        {
+            GameHUD.DrawSpriteIcon(manager != null ? manager.clockIcon : null, rect);
+        }
+        else if (index == 2)
+        {
+            GUIStyle star = new GUIStyle(headingStyle) { fontSize = Mathf.RoundToInt(rect.height * 0.9f), normal = { textColor = Color.white } };
+            GUI.Label(rect, "★", star);
+        }
+        else
+        {
+            GUI.DrawTexture(rect, gamepadIconTexture, ScaleMode.ScaleToFit, true);
+        }
+    }
+
+    private static void DrawSimplePanel(Rect rect)
+    {
+        Color previous = GUI.color;
+        GUI.color = new Color(0.035f, 0.065f, 0.095f, 0.92f);
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        GUI.color = new Color(0.58f, 0.68f, 0.76f, 0.78f);
+        float thickness = Mathf.Clamp(rect.width * 0.003f, 1.5f, 3f);
+        GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, thickness), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.x, rect.yMax - thickness, rect.width, thickness), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.x, rect.y, thickness, rect.height), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.xMax - thickness, rect.y, thickness, rect.height), Texture2D.whiteTexture);
+        GUI.color = previous;
+    }
+
+    private static void DrawSimpleCard(Rect rect)
+    {
+        Color previous = GUI.color;
+        GUI.color = new Color(0.075f, 0.12f, 0.16f, 0.98f);
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        GUI.color = new Color(0.34f, 0.44f, 0.51f, 0.9f);
+        float thickness = Mathf.Clamp(rect.width * 0.006f, 1f, 2f);
+        GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, thickness), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.x, rect.yMax - thickness, rect.width, thickness), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.x, rect.y, thickness, rect.height), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.xMax - thickness, rect.y, thickness, rect.height), Texture2D.whiteTexture);
+        GUI.color = previous;
+    }
+
+    private void DrawSimpleButton(Rect rect, string label)
+    {
+        DrawSimpleCard(rect);
+        GUIStyle style = new GUIStyle(headingStyle)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = Mathf.RoundToInt(Mathf.Clamp(rect.height * 0.40f, 24f, 42f)),
+            normal = { textColor = Color.white }
+        };
+        GUI.Label(rect, label, style);
+    }
+
+    private void DrawHomeNavigationButton(Rect rect)
+    {
+        bool hovered = rect.Contains(Event.current.mousePosition);
+        bool pressed = Event.current.type == EventType.MouseDown && hovered;
+        Rect drawRect = pressed ? new Rect(rect.x, rect.y + 3f, rect.width, rect.height) : rect;
+        GUI.color = new Color(0.18f, 0.12f, 0.09f, 0.45f);
+        GUI.DrawTexture(new Rect(drawRect.x, drawRect.y + 7f, rect.width, rect.height), roundButtonTexture);
+        GUI.color = hovered ? Color.white : Color.white;
+        GUI.DrawTexture(drawRect, roundButtonTexture);
+        GUI.color = Color.white;
+        float inset = rect.width * 0.22f;
+        GUI.DrawTexture(new Rect(drawRect.x + inset, drawRect.y + inset, rect.width - inset * 2f, rect.height - inset * 2f), homeIconTexture, ScaleMode.ScaleToFit, true);
     }
 
     private void DrawIconButton(Rect rect, Texture2D icon, System.Action onClick)
@@ -154,10 +255,16 @@ public class MainMenuUI : MonoBehaviour
             Rect row = new Rect(rect.x, rect.y + i * (rowHeight + gap), rect.width, rowHeight);
             GUI.DrawTexture(row, lockedTileTexture);
             float iconWidth = Mathf.Min(76f, row.height * 0.72f);
-            GUIStyle recordLabel = new GUIStyle(tabStyle) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(Mathf.Clamp(row.height * 0.22f, 19f, 27f)) };
-            GUIStyle recordValue = new GUIStyle(headingStyle) { fontSize = Mathf.RoundToInt(Mathf.Clamp(row.height * 0.47f, 32f, 54f)) };
-            GUI.Label(new Rect(row.x + 10f, row.y + 4f, row.width - 20f, row.height * 0.35f), labels[i], recordLabel);
-            GUI.Label(new Rect(row.x + 10f, row.y + row.height * 0.32f, row.width - 20f, row.height * 0.62f), values[i], recordValue);
+            GUIStyle recordLabel = new GUIStyle(tabStyle) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(Mathf.Clamp(row.height * 0.30f, 22f, 34f)) };
+            GUIStyle recordValue = new GUIStyle(headingStyle) { fontSize = Mathf.RoundToInt(Mathf.Clamp(row.height * 0.55f, 32f, 62f)) };
+            Rect labelRect = new Rect(row.x + 10f, row.y + 2f, row.width - 20f, row.height * 0.39f);
+            Rect valueRect = new Rect(row.x + 10f, row.y + row.height * 0.39f, row.width - 20f, row.height * 0.59f);
+            float labelWidth = recordLabel.CalcSize(new GUIContent(labels[i])).x;
+            if (labelWidth > labelRect.width) recordLabel.fontSize = Mathf.Max(18, Mathf.RoundToInt(recordLabel.fontSize * labelRect.width / labelWidth));
+            float valueWidth = recordValue.CalcSize(new GUIContent(values[i])).x;
+            if (valueWidth > valueRect.width) recordValue.fontSize = Mathf.Max(22, Mathf.RoundToInt(recordValue.fontSize * valueRect.width / valueWidth));
+            GUI.Label(labelRect, labels[i], recordLabel);
+            GUI.Label(valueRect, values[i], recordValue);
         }
     }
 
@@ -218,6 +325,107 @@ public class MainMenuUI : MonoBehaviour
         GUI.EndScrollView();
     }
 
+    private void DrawAchievementsFullScreen()
+    {
+        GUIStyle header = new GUIStyle(titleStyle)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = Mathf.RoundToInt(Mathf.Clamp(Screen.width / 17f, 34f, 62f)),
+            normal = { textColor = Color.white }
+        };
+        float margin = Mathf.Clamp(Screen.width * 0.045f, 18f, 54f);
+        float headerHeight = Mathf.Clamp(Screen.height * 0.12f, 64f, 104f);
+        float backHeight = Mathf.Clamp(Mathf.Min(Screen.width * 0.9f, 980f) * 0.14f, 106f, 150f);
+        GUI.Label(new Rect(margin, margin * 0.55f, Screen.width - margin * 2f, headerHeight), "ACHIEVEMENTS", header);
+
+        Rect listRect = new Rect(margin, margin * 0.55f + headerHeight, Screen.width - margin * 2f,
+            Screen.height - (margin * 1.1f + headerHeight + backHeight + margin));
+        float rowGap = Mathf.Clamp(listRect.height * 0.018f, 7f, 14f);
+        float rowHeight = Mathf.Clamp((listRect.height - rowGap * (MilestoneAnnouncer.AchievementCount - 1)) / MilestoneAnnouncer.AchievementCount, 72f, 108f);
+        float contentHeight = MilestoneAnnouncer.AchievementCount * rowHeight + (MilestoneAnnouncer.AchievementCount - 1) * rowGap;
+        Rect view = new Rect(0f, 0f, listRect.width - 16f, contentHeight);
+        scroll = GUI.BeginScrollView(listRect, scroll, view);
+
+        for (int i = 0; i < MilestoneAnnouncer.AchievementCount; i++)
+        {
+            float y = i * (rowHeight + rowGap);
+            bool unlocked = MilestoneAnnouncer.IsUnlocked(i);
+            Sprite assignedBadge = achievementBadges != null && i < achievementBadges.Length ? achievementBadges[i] : null;
+            Sprite badge = unlocked ? (assignedBadge != null ? assignedBadge : GetPlaceholderBadge()) : unknownAchievementBadge;
+            Rect row = new Rect(0f, y, view.width, rowHeight);
+            DrawSimpleCard(row);
+
+            float badgeSize = Mathf.Min(rowHeight * 0.88f, 104f);
+            float side = Mathf.Clamp(rowHeight * 0.15f, 14f, 24f);
+            Rect badgeHolder = new Rect(side, y + (rowHeight - badgeSize) * 0.5f, badgeSize, badgeSize);
+            Color previous = GUI.color;
+            GUI.color = new Color(0.12f, 0.18f, 0.23f, 1f);
+            GUI.DrawTexture(badgeHolder, Texture2D.whiteTexture);
+            GUI.color = new Color(0.38f, 0.47f, 0.54f, 1f);
+            float edge = 1.5f;
+            GUI.DrawTexture(new Rect(badgeHolder.x, badgeHolder.y, badgeHolder.width, edge), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(badgeHolder.x, badgeHolder.yMax - edge, badgeHolder.width, edge), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(badgeHolder.x, badgeHolder.y, edge, badgeHolder.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(badgeHolder.xMax - edge, badgeHolder.y, edge, badgeHolder.height), Texture2D.whiteTexture);
+            GUI.color = previous;
+            if (badge != null)
+            {
+                float imageInset = Mathf.Max(3f, badgeSize * 0.06f);
+                GUI.color = Color.white;
+                GameHUD.DrawSpriteIcon(badge, new Rect(badgeHolder.x + imageInset, badgeHolder.y + imageInset,
+                    badgeSize - imageInset * 2f, badgeSize - imageInset * 2f));
+                GUI.color = Color.white;
+            }
+
+            float textX = badgeHolder.xMax + Mathf.Clamp(rowHeight * 0.18f, 16f, 26f);
+            float textWidth = view.width - textX - side;
+            string rowTitle = unlocked ? MilestoneAnnouncer.GetAchievementName(i) : MilestoneAnnouncer.GetTargetText(i);
+            GUIStyle mainText = new GUIStyle(bodyStyle)
+            {
+                alignment = TextAnchor.MiddleLeft,
+                fontSize = Mathf.RoundToInt(Mathf.Clamp(rowHeight * 0.40f, 24f, 42f)),
+                normal = { textColor = Color.white }
+            };
+            Rect mainRect = new Rect(textX, y + rowHeight * 0.08f, textWidth, rowHeight * (unlocked ? 0.50f : 0.60f));
+            float measuredTitleWidth = mainText.CalcSize(new GUIContent(rowTitle)).x;
+            if (measuredTitleWidth > mainRect.width) mainText.fontSize = Mathf.Max(21, Mathf.RoundToInt(mainText.fontSize * mainRect.width / measuredTitleWidth));
+            GUI.Label(mainRect, rowTitle, mainText);
+
+            if (!unlocked)
+            {
+                GUIStyle progress = new GUIStyle(detailStyle)
+                {
+                    alignment = TextAnchor.MiddleLeft,
+                    fontSize = Mathf.RoundToInt(Mathf.Clamp(rowHeight * 0.25f, 19f, 28f)),
+                    fontStyle = FontStyle.Bold,
+                    normal = { textColor = Color.white }
+                };
+                GUI.Label(new Rect(textX, y + rowHeight * 0.60f, textWidth, rowHeight * 0.30f),
+                    MilestoneAnnouncer.GetCurrentProgressText(i, 0, 0), progress);
+            }
+            else
+            {
+                string description = MilestoneAnnouncer.GetAchievementDescription(i);
+                GUIStyle subtitle = new GUIStyle(detailStyle)
+                {
+                    alignment = TextAnchor.MiddleLeft,
+                    fontSize = Mathf.RoundToInt(Mathf.Clamp(rowHeight * 0.21f, 17f, 23f)),
+                    normal = { textColor = new Color(0.84f, 0.89f, 0.94f) }
+                };
+                Rect subtitleRect = new Rect(textX, y + rowHeight * 0.56f, textWidth, rowHeight * 0.34f);
+                float subtitleWidth = subtitle.CalcSize(new GUIContent(description)).x;
+                if (subtitleWidth > subtitleRect.width) subtitle.fontSize = Mathf.Max(16, Mathf.RoundToInt(subtitle.fontSize * subtitleRect.width / subtitleWidth));
+                GUI.Label(subtitleRect, description, subtitle);
+            }
+        }
+        GUI.EndScrollView();
+
+        float homeSize = Mathf.Clamp(Mathf.Min(Screen.width * 0.9f, 980f) * 0.14f, 106f, 150f);
+        Rect homeRect = new Rect((Screen.width - homeSize) * 0.5f, Screen.height - homeSize - margin * 0.35f, homeSize, homeSize);
+        DrawHomeNavigationButton(homeRect);
+        if (GUI.Button(homeRect, GUIContent.none, GUIStyle.none)) showStats = false;
+    }
+
     private Sprite GetPlaceholderBadge()
     {
         if (achievementBadges == null) return null;
@@ -239,10 +447,20 @@ public class MainMenuUI : MonoBehaviour
             float charWidth = titleStyle.CalcSize(new GUIContent(character)).x;
             Rect rect = new Rect(x, y, charWidth, height);
             outlineStyle.normal.textColor = Color.black;
+            outlineStyle.hover.textColor = Color.black;
+            outlineStyle.active.textColor = Color.black;
+            outlineStyle.focused.textColor = Color.black;
+            outlineStyle.hover.textColor = Color.black;
+            outlineStyle.active.textColor = Color.black;
+            outlineStyle.focused.textColor = Color.black;
             for (int dx = -2; dx <= 2; dx++)
             for (int dy = -2; dy <= 2; dy++)
                 if (dx != 0 || dy != 0) GUI.Label(new Rect(rect.x + dx, rect.y + dy, rect.width, rect.height), character, outlineStyle);
-            titleStyle.normal.textColor = TitleColors[i % TitleColors.Length];
+            Color letterColor = TitleColors[i % TitleColors.Length];
+            titleStyle.normal.textColor = letterColor;
+            titleStyle.hover.textColor = letterColor;
+            titleStyle.active.textColor = letterColor;
+            titleStyle.focused.textColor = letterColor;
             GUI.Label(rect, character, titleStyle);
             x += charWidth;
         }
@@ -266,6 +484,8 @@ public class MainMenuUI : MonoBehaviour
         playIconTexture = MakePlayIcon(64);
         trophyIconTexture = MakeTrophyIcon(64);
         hamburgerIconTexture = MakeHamburgerIcon(64);
+        homeIconTexture = MakeHomeIcon(64);
+        gamepadIconTexture = MakeGamepadIcon(64);
     }
 
     private static Texture2D MakeRoundedTexture(int size, Color fill, Color border, Color outline)
@@ -339,14 +559,51 @@ public class MainMenuUI : MonoBehaviour
         texture.SetPixels32(pixels); texture.Apply(false, true); return texture;
     }
 
+    private static Texture2D MakeHomeIcon(int size)
+    {
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, hideFlags = HideFlags.HideAndDontSave };
+        Color32[] pixels = new Color32[size * size];
+        Vector2 a = new Vector2(size * 0.12f, size * 0.48f);
+        Vector2 b = new Vector2(size * 0.50f, size * 0.88f);
+        Vector2 c = new Vector2(size * 0.88f, size * 0.48f);
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            bool roof = PointInTriangle(new Vector2(x, y), a, b, c);
+            bool body = x >= size * 0.22f && x <= size * 0.78f && y >= size * 0.18f && y <= size * 0.55f;
+            bool door = x >= size * 0.43f && x <= size * 0.57f && y >= size * 0.18f && y <= size * 0.39f;
+            if ((roof || body) && !door) pixels[y * size + x] = Color.white;
+        }
+        texture.SetPixels32(pixels); texture.Apply(false, true); return texture;
+    }
+
+    private static Texture2D MakeGamepadIcon(int size)
+    {
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, hideFlags = HideFlags.HideAndDontSave };
+        Color32[] pixels = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            bool body = x >= 14 && x <= 50 && y >= 20 && y <= 43;
+            bool leftGrip = x >= 10 && x <= 23 && y >= 34 && y <= 51;
+            bool rightGrip = x >= 41 && x <= 54 && y >= 34 && y <= 51;
+            bool dpad = (x >= 18 && x <= 30 && y >= 29 && y <= 33) || (x >= 22 && x <= 26 && y >= 25 && y <= 37);
+            bool buttons = (x == 43 || x == 50) && (y == 30 || y == 36);
+            int pixel = y * size + x;
+            if (body || leftGrip || rightGrip) pixels[pixel] = Color.white;
+            if (dpad || buttons) pixels[pixel] = new Color32(0, 0, 0, 0);
+        }
+        texture.SetPixels32(pixels); texture.Apply(false, true); return texture;
+    }
+
     private static bool PointInTriangle(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
     {
-        float d1 = (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y);
-        float d2 = (p.x - c.x) * (b.y - c.y) - (b.x - c.x) * (p.y - c.y);
-        float d3 = (p.x - a.x) * (c.y - a.y) - (c.x - a.x) * (p.y - a.y);
-        bool hasNeg = d1 < 0f || d2 < 0f || d3 < 0f;
-        bool hasPos = d1 > 0f || d2 > 0f || d3 > 0f;
-        return !(hasNeg && hasPos);
+        float first = (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y);
+        float second = (p.x - c.x) * (b.y - c.y) - (b.x - c.x) * (p.y - c.y);
+        float third = (p.x - a.x) * (c.y - a.y) - (c.x - a.x) * (p.y - a.y);
+        bool negative = first < 0f || second < 0f || third < 0f;
+        bool positive = first > 0f || second > 0f || third > 0f;
+        return !(negative && positive);
     }
 
     private static string FormatTime(float time)
@@ -365,6 +622,8 @@ public class MainMenuUI : MonoBehaviour
         if (roundButtonTexture != null) Destroy(roundButtonTexture);
         if (playIconTexture != null) Destroy(playIconTexture);
         if (trophyIconTexture != null) Destroy(trophyIconTexture);
+        if (homeIconTexture != null) Destroy(homeIconTexture);
+        if (gamepadIconTexture != null) Destroy(gamepadIconTexture);
         if (hamburgerIconTexture != null) Destroy(hamburgerIconTexture);
     }
 }
