@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections.Generic;
+using UnityEngine.SceneManagement;
 
 public class TowerManager : MonoBehaviour
 {
@@ -27,6 +28,17 @@ public class TowerManager : MonoBehaviour
 
     [Header("Cenário")]
     public Sprite[] cloudSprites;
+
+    [Header("Badges")]
+    [Tooltip("A posição de cada sprite corresponde ao índice da conquista na tela; expanda o array para adicionar mais.")]
+    public Sprite[] achievementBadges;
+    [Tooltip("Imagem mostrada em todas as conquistas ainda bloqueadas.")]
+    public Sprite unknownAchievementBadge;
+
+    [Header("Áudio")]
+    public AudioClip mainSong;
+    public AudioClip blockPlacedSound;
+    public AudioClip perfectPlacementSound;
 
     [Header("Próximo bloco")]
     public float nextBlockSpawnDelay = 0.10f;
@@ -55,6 +67,10 @@ public class TowerManager : MonoBehaviour
     private MilestoneAnnouncer milestoneAnnouncer;
     private StarFieldBackground starFieldBackground;
     private float gameStartTime;
+    private MainMenuUI mainMenuUI;
+    private MenuBackdrop menuBackdrop;
+    private AudioSource musicSource;
+    private AudioSource soundEffectsSource;
 
     void Awake()
     {
@@ -73,6 +89,25 @@ public class TowerManager : MonoBehaviour
         Sprite blockSprite = blockRenderer != null ? blockRenderer.sprite : null;
         gameHUD.SetBlockIcon(blockSprite);
         gameOverUI.SetBlockIcon(blockSprite);
+        gameOverUI.SetAchievementBadges(achievementBadges, unknownAchievementBadge);
+        mainMenuUI = GetComponent<MainMenuUI>();
+        if (mainMenuUI == null) mainMenuUI = gameObject.AddComponent<MainMenuUI>();
+        mainMenuUI.Initialize(this, achievementBadges, unknownAchievementBadge);
+        gameOverUI.SetMenuAction(ShowMainMenu);
+        gameHUD.Hide();
+
+        AudioSource[] audioSources = GetComponents<AudioSource>();
+        musicSource = audioSources.Length > 0 ? audioSources[0] : gameObject.AddComponent<AudioSource>();
+        soundEffectsSource = audioSources.Length > 1 ? audioSources[1] : gameObject.AddComponent<AudioSource>();
+        musicSource.playOnAwake = false;
+        musicSource.loop = true;
+        musicSource.spatialBlend = 0f;
+        musicSource.volume = 0.38f;
+        musicSource.clip = mainSong;
+        soundEffectsSource.playOnAwake = false;
+        soundEffectsSource.loop = false;
+        soundEffectsSource.spatialBlend = 0f;
+        soundEffectsSource.volume = 0.9f;
 
         towerPresentation = GetComponent<TowerPresentation>();
         if (towerPresentation == null)
@@ -82,6 +117,9 @@ public class TowerManager : MonoBehaviour
         if (cloudBackground == null)
             cloudBackground = gameObject.AddComponent<CloudBackground>();
         cloudBackground.Initialize(cloudSprites, towerPresentation.cameraTransform);
+        menuBackdrop = GetComponent<MenuBackdrop>();
+        if (menuBackdrop == null) menuBackdrop = gameObject.AddComponent<MenuBackdrop>();
+        menuBackdrop.Initialize(blockPrefab, blockColors, windowModels);
 
         skyProgression = GetComponent<SkyProgression>();
         if (skyProgression == null)
@@ -101,14 +139,56 @@ public class TowerManager : MonoBehaviour
     // Inicialização e atualização do jogo
     void Start()
     {
+        mainMenuUI.Show();
+        menuBackdrop.SetVisible(true);
+        cloudBackground.SetMenuMode(true);
+        SetCableVisible(false);
+        if (mainSong != null) musicSource.Play();
+    }
+
+    public void StartGame()
+    {
+        gameOver = false;
+        landedBlocks = 0;
+        perfectStreak = 0;
+        bestPerfectStreakThisRun = 0;
+        landedBodies.Clear();
+        lastLandedBlock = null;
+        milestoneAnnouncer.ResetRun();
+        gameOverUI.Hide();
+        gameHUD.Show();
+        mainMenuUI.Hide();
+        menuBackdrop.SetVisible(false);
+        cloudBackground.SetMenuMode(false);
+        SetCableVisible(true);
         gameStartTime = Time.time;
+        PlayerPrefs.SetInt("TowerUp_GamesPlayed", PlayerPrefs.GetInt("TowerUp_GamesPlayed", 0) + 1);
+        if (PlayerPrefs.GetInt("TowerUp_GamesPlayed", 0) >= 10) MilestoneAnnouncer.Unlock(7);
+        PlayerPrefs.Save();
         SpawnBlock();
+    }
+
+    private void SetCableVisible(bool isVisible)
+    {
+        if (towerPresentation != null && towerPresentation.cableRig != null)
+            towerPresentation.cableRig.gameObject.SetActive(isVisible);
+    }
+
+    public void ShowMainMenu()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
     void Update()
     {
         if (gameOver)
             return;
+
+        if (mainMenuUI.IsVisible)
+        {
+            cloudBackground.UpdateClouds(20);
+            return;
+        }
 
         if (currentBlock != null && Mouse.current.leftButton.wasPressedThisFrame)
         {
@@ -238,11 +318,14 @@ public class TowerManager : MonoBehaviour
             landedBodies.Add(landedBody);
 
         bool isPerfectFit = lastLandedBlock != null && TryPlayPerfectFitEffect(lastLandedBlock, landedBlock);
+        PlaySoundEffect(blockPlacedSound, 0.75f);
         if (isPerfectFit)
         {
+            PlaySoundEffect(perfectPlacementSound, 0.9f);
             perfectStreak++;
             bestPerfectStreakThisRun = Mathf.Max(bestPerfectStreakThisRun, perfectStreak);
             StabilizePerfectTower();
+            MilestoneAnnouncer.RecordPerfect(perfectStreak);
         }
         else
         {
@@ -250,6 +333,8 @@ public class TowerManager : MonoBehaviour
         }
 
         landedBlocks++;
+        for (int i = 0; i < MilestoneAnnouncer.Count; i++)
+            if (landedBlocks >= MilestoneAnnouncer.GetFloor(i)) MilestoneAnnouncer.Unlock(i);
         lastLandedBlock = landedBlock;
 
         if (waitingForNextBlock)
@@ -257,6 +342,12 @@ public class TowerManager : MonoBehaviour
 
         waitingForNextBlock = true;
         nextBlockSpawnTime = Time.time + (landedBlocks == 1 ? 0f : nextBlockSpawnDelay);
+    }
+
+    private void PlaySoundEffect(AudioClip clip, float volume)
+    {
+        if (clip != null && soundEffectsSource != null)
+            soundEffectsSource.PlayOneShot(clip, volume);
     }
 
     private void StabilizePerfectTower()
@@ -406,22 +497,22 @@ public class TowerManager : MonoBehaviour
         int previousBestBlocks = PlayerPrefs.GetInt("TowerUp_BestBlocks", 0);
         int previousBestPerfectStreak = PlayerPrefs.GetInt("TowerUp_BestPerfectStreak", 0);
 
-        gameOverUI.Show(
-            elapsedTime,
-            landedBlocks,
-            bestPerfectStreakThisRun,
-            previousBestTime,
-            previousBestBlocks,
-            previousBestPerfectStreak
-        );
-        gameHUD.Hide();
-
         PlayerPrefs.SetFloat("TowerUp_BestTime", Mathf.Max(previousBestTime, elapsedTime));
         PlayerPrefs.SetInt("TowerUp_BestBlocks", Mathf.Max(previousBestBlocks, landedBlocks));
         PlayerPrefs.SetInt(
             "TowerUp_BestPerfectStreak",
             Mathf.Max(previousBestPerfectStreak, bestPerfectStreakThisRun)
         );
+        gameOverUI.Show(
+            elapsedTime,
+            landedBlocks,
+            bestPerfectStreakThisRun,
+            previousBestTime,
+            previousBestBlocks,
+            previousBestPerfectStreak,
+            MilestoneAnnouncer.GetNextAchievement(landedBlocks, bestPerfectStreakThisRun)
+        );
+        gameHUD.Hide();
         PlayerPrefs.Save();
 
         Debug.Log("GAME OVER!");

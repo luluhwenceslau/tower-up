@@ -25,6 +25,8 @@ public class GameHUD : MonoBehaviour
         isVisible = false;
     }
 
+    public void Show() { isVisible = true; }
+
     private void OnGUI()
     {
         if (!isVisible)

@@ -12,6 +12,7 @@ public class CloudBackground : MonoBehaviour
     private const float SlowSpawnInterval = 16f;
     private const float FrequentSpawnInterval = 9f;
     private const int CloudSortingOrder = -10;
+    private const float CloudDepth = 5f;
     private const float CloudAlpha = 0.82f;
     private const float MinimumCloudWidth = 1.25f;
     private const float MaximumCloudWidth = 2.65f;
@@ -25,6 +26,15 @@ public class CloudBackground : MonoBehaviour
     private bool hasReachedCloudAltitude;
     private int previousSpriteIndex = -1;
     private int spawnedCloudCount;
+    private bool menuMode;
+
+    public void SetMenuMode(bool enabled)
+    {
+        menuMode = enabled;
+        hasReachedCloudAltitude = false;
+        if (enabled) nextSpawnTime = Time.time + 0.15f;
+        else DeactivateAllClouds();
+    }
 
     private sealed class CloudInstance
     {
@@ -67,7 +77,7 @@ public class CloudBackground : MonoBehaviour
             if (TrySpawnCloud(landedBlocks))
             {
                 float progress = Mathf.InverseLerp(StartAtBlock, FrequentAtBlock, landedBlocks);
-                float interval = Mathf.Lerp(SlowSpawnInterval, FrequentSpawnInterval, progress);
+                float interval = menuMode ? 3.5f : Mathf.Lerp(SlowSpawnInterval, FrequentSpawnInterval, progress);
                 nextSpawnTime = Time.time + Random.Range(interval * 0.8f, interval * 1.2f);
             }
             else
@@ -122,22 +132,23 @@ public class CloudBackground : MonoBehaviour
         float scale = targetWidth / sprite.bounds.size.x;
         cloud.gameObject.transform.localScale = new Vector3(scale, scale, 1f);
         cloud.renderer.color = new Color(1f, 1f, 1f, distantIntroCloud ? 0.68f : CloudAlpha);
-        int laneIndex = Random.Range(0, CloudLaneOffsets.Length);
+        int cloudIndex = Mathf.Max(0, clouds.IndexOf(cloud));
+        int laneIndex = cloudIndex == 0 ? 0 : CloudLaneOffsets.Length - 1;
         cloud.direction = sceneDirection;
-        cloud.speed = Random.Range(0.25f, 0.45f);
-        cloud.verticalOffset = distantIntroCloud
-            ? Mathf.Max(0f, targetCamera.orthographicSize - 0.8f)
-            : CloudLaneOffsets[laneIndex] + Random.Range(-0.16f, 0.16f);
+        cloud.speed = menuMode ? Random.Range(0.55f, 0.85f) : Random.Range(0.25f, 0.45f);
+        cloud.verticalOffset = CloudLaneOffsets[laneIndex] + Random.Range(-0.12f, 0.12f);
 
         float halfViewWidth = targetCamera.orthographicSize * targetCamera.aspect;
         float halfCloudWidth = targetWidth * 0.5f;
-        float startX = cloud.direction > 0f
-            ? -halfViewWidth - halfCloudWidth - 0.5f
-            : halfViewWidth + halfCloudWidth + 0.5f;
+        float startX = menuMode
+            ? Random.Range(-halfViewWidth + halfCloudWidth, halfViewWidth - halfCloudWidth)
+            : cloud.direction > 0f
+                ? -halfViewWidth - halfCloudWidth - 0.5f
+                : halfViewWidth + halfCloudWidth + 0.5f;
         cloud.gameObject.transform.position = new Vector3(
             startX,
             targetCamera.transform.position.y + cloud.verticalOffset,
-            distantIntroCloud ? 20f : 5f
+            CloudDepth
         );
         cloud.gameObject.SetActive(true);
         spawnedCloudCount++;
